@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LLM Playground</title>
+  <style>
+    :root{
+      --bg: #0f1220;
+      --panel: #171a2b;
+      --panel-2: #1e2236;
+      --accent: #7c5cff;
+      --accent-2: #22d3ee;
+      --text: #e7eaf6;
+      --muted: #9aa2c3;
+      --border: #2a2f4a;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --error: #ef4444;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.03);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --radius-xs: 8px;
+      --gap: 14px;
+      --gap-lg: 18px;
+      --input-h: 44px;
+    }
+    *{ box-sizing:border-box }
+    html, body{
+      height:100%;
+      margin:0;
+      background:
+        radial-gradient(1200px 600px at 10% -20%, rgba(124,92,255,0.18), transparent 60%),
+        radial-gradient(1000px 500px at 110% 10%, rgba(34,211,238,0.12), transparent 60%),
+        linear-gradient(180deg, #0b0e1a 0%, #0f1220 60%, #0f1220 100%);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    .app{
+      display:grid;
+      grid-template-columns: 380px 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: var(--gap);
+      height:100vh;
+      padding: var(--gap-lg);
+      min-width: 320px;
+    }
+    header{
+      grid-column: 1 / -1;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 14px 18px;
+      background: linear-gradient(180deg, rgba(124,92,255,0.12), rgba(124,92,255,0.05));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    header .brand{
+      display:flex; align-items:center; gap:12px;
+    }
+    .logo{
+      width:32px;height:32px;border-radius:10px;
+      background:
+        conic-gradient(from 210deg, var(--accent), var(--accent-2), #57ffa5, var(--accent) 330deg);
+      border:1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 6px 16px rgba(124,92,255,0.35), inset 0 0 12px rgba(255,255,255,0.12);
+    }
+    .title{
+      font-weight:700; letter-spacing:0.3px;
+    }
+    .status-dot{
+      width:10px;height:10px;border-radius:50%;
+      background: var(--good);
+      box-shadow: 0 0 10px var(--good);
+      margin-left:8px;
+    }
+    .actions{
+      display:flex; align-items:center; gap:10px;
+    }
+    .btn{
+      height:36px; padding:0 14px; border-radius:999px;
+      border:1px solid var(--border); color:var(--text);
+      background: linear-gradient(180deg, #232846, #1a1f36);
+      box-shadow: var(--shadow);
+      cursor:pointer; transition: 0.2s ease;
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn:hover{ transform: translateY(-1px); border-color:#3a3f66 }
+    .btn.primary{
+      background: linear-gradient(180deg, #7c5cff, #5a45d6);
+      border-color: rgba(124,92,255,0.65);
+      box-shadow: 0 12px 24px rgba(124,92,255,0.35), inset 0 0 0 1px rgba(255,255,255,0.15);
+    }
+    .btn.ghost{
+      background: transparent; border-color:#334;
+    }
+
+    /* Sidebar (Parameters) */
+    .sidebar{
+      display:flex; flex-direction:column; gap: var(--gap);
+      background: linear-gradient(180deg, #14182b 0%, #13172a 100%);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding:16px;
+      min-height:0; /* for proper grid scroll allocation */
+      overflow: hidden;
+    }
+    .params-scroll{
+      display:flex; flex-direction:column; gap: var(--gap);
+      min-height:0;
+      overflow:auto;
+      padding-right:6px;
+      scrollbar-width: thin;
+      scrollbar-color: #3a3f66 transparent;
+      max-height: 100%;
+    }
+    .section-title{
+      font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+      border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:6px;
+      position: sticky; top: 0; background: linear-gradient(180deg, #14182b 0%, #13172a 100%); z-index: 1;
+    }
+    .field{
+      display:flex; flex-direction:column; gap:8px;
+      background: linear-gradient(180deg, #161a2f, #15182b);
+      border:1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding:10px;
+    }
+    .field-row{
+      display:flex; gap:10px;
+    }
+    label{
+      font-size:12px; color:var(--muted);
+    }
+    input[type="text"], input[type="number"], select, textarea{
+      width:100%; color:var(--text);
+      background: #0f1430;
+      border:1px solid #2a2f4a;
+      border-radius: 10px;
+      padding:10px 12px;
+      outline:none; transition: .2s;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus{
+      border-color: #3a3f66; box-shadow: 0 0 0 3px rgba(124,92,255,0.2), inset 0 0 0 1px rgba(255,255,255,0.05);
+    }
+    textarea{
+      min-height:84px; resize: vertical;
+      max-height: 220px;
+    }
+    .toggle{
+      display:inline-flex; align-items:center; gap:10px; cursor:pointer;
+      user-select:none;
+    }
+    .switch{
+      width:44px; height:24px; background:#2a2f4a; border-radius:999px; position:relative;
+      transition:.2s; border:1px solid #38406a;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.35);
+    }
+    .switch::after{
+      content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+      background: linear-gradient(180deg, #f6f7fb, #c9cde6);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      transition:.2s;
+    }
+    .switch.on{ background: linear-gradient(180deg, #6b8aff, #4f63ff); border-color: rgba(124,92,255,0.6) }
+    .switch.on::after{ left:23px }
+
+    /* Main conversation area */
+    .main{
+      display:grid;
+      grid-template-rows: 1fr auto;
+      gap: var(--gap);
+      min-height:0;
+    }
+    .conversation{
+      background: linear-gradient(180deg, #14172a, #111426);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:auto;
+      padding: 16px;
+      scroll-behavior: smooth;
+    }
+    .msg{
+      display:flex; gap:10px; margin-bottom:14px; align-items:flex-start;
+      animation: pop .2s ease-out;
+    }
+    @keyframes pop{ from{ transform: translateY(4px); opacity:0 } to{ transform:none; opacity:1 } }
+    .avatar{
+      width:34px; height:34px; border-radius:50%;
+      background: radial-gradient(circle at 30% 30%, #fff, #cbd5ff);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      flex:0 0 auto;
+      display:grid; place-items:center; color:#14172a; font-weight:700; font-size:14px;
+    }
+    .avatar.bot{
+      background: radial-gradient(circle at 30% 30%, #7c5cff, #4f46e5);
+      color:white;
+    }
+    .bubble{
+      background: #171a2b; border:1px solid var(--border);
+      padding:12px 14px; border-radius: 14px;
+      max-width: min(800px, 90%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+      line-height:1.4;
+      white-space: pre-wrap;
+    }
+    .msg.user .bubble{
+      background: #12213a; border-color:#243154;
+    }
+    .typing{
+      display:inline-block; min-width:28px;
+    }
+    .dot{
+      display:inline-block; width:6px;height:6px;border-radius:50%;
+      background:#9aa2c3; margin-right:4px; opacity:0.2; animation: blink 1.2s infinite;
+    }
+    .dot:nth-child(2){ animation-delay:.2s }
+    .dot:nth-child(3){ animation-delay:.4s }
+    @keyframes blink{ 0%,80%,100%{ opacity:.2 } 40%{ opacity:1 } }
+
+    /* Composer */
+    .composer{
+      display:grid; grid-template-columns: 1fr auto; gap: 10px;
+      background: linear-gradient(180deg, #15182b, #14182b);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding:10px;
+    }
+    .input-wrap{
+      display:flex; gap:10px; align-items:flex-end;
+    }
+    .prompt{
+      flex:1; min-height:48px; max-height:160px; resize:vertical;
+      padding:12px 14px; border-radius:12px; border:1px solid #2a2f4a;
+      background:#0f1430; color:var(--text);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+    .send{
+      min-width:120px; height:48px;
+      border-radius:12px; border:1px solid rgba(124,92,255,0.6);
+      background: linear-gradient(180deg, #7c5cff, #5a45d6);
+      color:white; font-weight:700; cursor:pointer;
+      box-shadow: 0 14px 26px rgba(124,92,255,0.35);
+      transition:.2s; display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .send:hover{ transform: translateY(-1px) }
+
+    /* Footer */
+    footer{
+      grid-column: 1 / -1;
+      display:flex; align-items:center; justify-content:space-between;
+      color: var(--muted);
+      padding: 10px 4px;
+      font-size:12px;
+      opacity:.9;
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px){
+      .app{ grid-template-columns: 340px 1fr; }
+    }
+    @media (max-width: 920px){
+      .app{ grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; }
+      .sidebar{ order:2 }
+      .main{ order:3 }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.2/+esm"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div class="title">LLM Playground</div>
+        <div class="status-dot" title="Pronto"></div>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="btnClear" title="Limpar conversa">Limpar</button>
+        <button class="btn primary" id="btnFake" title="Gerar resposta demo">Resposta Demo</button>
+      </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="section-title">Parâmetros</div>
+      <div class="params-scroll" id="paramsScroll" role="region" aria-label="Caixa de parâmetros com rolagem">
+        <form id="paramsForm" novalidate>
+          <div class="field">
+            <div class="field-row" style="justify-content:space-between; align-items:center;">
+              <label for="instructions">Instruções do sistema</label>
+              <div class="toggle" id="toggleInstructions">
+                <div class="switch" id="switchInstructions" role="switch" aria-checked="true" aria-label="Ativar instruções"></div>
+                <span style="font-size:12px; color:var(--muted)">Ativar</span>
+              </div>
+            </div>
+            <textarea id="instructions" name="instructions" placeholder="Ex.: Você é um assistente útil e conciso. Responda em português." aria-label="Instructions" style="min-height:96px"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="userInput">Entrada do usuário (userInput)</label>
+            <textarea id="userInput" name="userInput" placeholder="Pergunta ou comando a ser enviado ao endpoint" aria-label="User input"></textarea>
+          </div>
+
+          <div class="field">
+            <div class="field-row">
+              <div style="flex:1">
+                <label for="provider">Provider</label>
+                <select id="provider" name="provider">
+                  <option value="azure">Azure OpenAI</option>
+                  <option value="openai" selected>OpenAI</option>
+                </select>
+              </div>
+              <div style="flex:1">
+                <label for="model">Model</label>
+                <select id="model" name="model">
+                  <option value="gpt-4o" selected>gpt-4o</option>
+                  <option value="gpt-4o-mini">gpt-4o-mini</option>
+                  <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="field-row">
+              <div style="flex:1">
+                <label for="maxTokens">Max Token</label>
+                <input id="maxTokens" name="maxToken" type="number" min="1" step="1" value="4096"/>
+              </div>
+              <div style="flex:1">
+                <label for="topK">Top K</label>
+                <input id="topK" name="topK" type="number" min="0" step="1" value="5"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="kbIds">Knowledge Base IDs</label>
+            <input id="kbIds" name="knowledgeBaseIds" type="text" placeholder="uuid-1, uuid-2, ..." aria-describedby="kbHelp"/>
+            <small id="kbHelp" style="color:var(--muted)">Separe múltiplos IDs por vírgula.</small>
+          </div>
+
+          <div class="field">
+            <label for="strategy">Strategy</label>
+            <select id="strategy" name="strategy">
+              <option value="cosine_similarity" selected>cosine_similarity</option>
+              <option value="dot_product">dot_product</option>
+              <option value="euclidean">euclidean</option>
+            </select>
+          </div>
+
+          <div class="field" style="position:sticky; bottom:0; z-index:2;">
+            <div class="field-row" style="gap:8px;">
+              <button type="button" class="btn ghost" id="btnTestar">Testar POST /test</button>
+              <button type="submit" class="btn primary" id="btnSalvar">Salvar parâmetros</button>
+            </div>
+            <div id="formStatus" aria-live="polite" style="font-size:12px; color:var(--muted); margin-top:6px;">Pronto.</div>
+          </div>
+        </form>
+      </div>
+    </aside>
+
+    <section class="main">
+      <div class="conversation" id="conversation" aria-live="polite"></div>
+
+      <div class="composer">
+        <div class="input-wrap">
+          <textarea id="prompt" class="prompt" placeholder="Digite sua mensagem..." aria-label="Prompt"></textarea>
+        </div>
+        <button class="send" id="btnSend" title="Enviar (Ctrl+Enter)">Enviar</button>
+      </div>
+    </section>
+
+    <footer>
+      <div>Rolagem na caixa de parâmetros e na conversa.</div>
+      <div>Demo local sem chamadas externas obrigatórias</div>
+    </footer>
+  </div>
+
+  <script type="module">
+    // Procedural avatar initial
+    function createAvatar(initials, isBot=false){
+      const av = document.createElement('div');
+      av.className = 'avatar' + (isBot ? ' bot' : '');
+      av.textContent = initials.toUpperCase();
+      return av;
+    }
+    function createBubble(text){
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      b.textContent = text;
+      return b;
+    }
+    function createTyping(){
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      const wrap = document.createElement('span');
+      wrap.className = 'typing';
+      wrap.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+      b.appendChild(wrap);
+      return b;
+    }
+
+    // Elements
+    const convo = document.getElementById('conversation');
+    const promptEl = document.getElementById('prompt');
+    const btnSend = document.getElementById('btnSend');
+    const btnClear = document.getElementById('btnClear');
+    const btnFake = document.getElementById('btnFake');
+
+    // Params form elements
+    const form = document.getElementById('paramsForm');
+    const formStatus = document.getElementById('formStatus');
+    const userInputEl = document.getElementById('userInput');
+    const instructionsEl = document.getElementById('instructions');
+    const providerEl = document.getElementById('provider');
+    const modelEl = document.getElementById('model');
+    const maxTokensEl = document.getElementById('maxTokens');
+    const topKEl = document.getElementById('topK');
+    const kbIdsEl = document.getElementById('kbIds');
+    const strategyEl = document.getElementById('strategy');
+    const btnTestar = document.getElementById('btnTestar');
+
+    const switchInstructions = document.getElementById('switchInstructions');
+    const toggleInstructions = document.getElementById('toggleInstructions');
+
+    // State
+    const state = {
+      instructionsEnabled: true
+    };
+
+    function setInstructionsEnabled(val){
+      state.instructionsEnabled = !!val;
+      switchInstructions.classList.toggle('on', state.instructionsEnabled);
+      switchInstructions.setAttribute('aria-checked', String(state.instructionsEnabled));
+      instructionsEl.disabled = !state.instructionsEnabled;
+      instructionsEl.style.opacity = state.instructionsEnabled ? '1' : '0.6';
+    }
+    setInstructionsEnabled(true);
+    toggleInstructions.addEventListener('click', () => setInstructionsEnabled(!state.instructionsEnabled));
+
+    // Conversation helpers
+    function appendMessage(role, text){
+      const msg = document.createElement('div');
+      msg.className = 'msg ' + role;
+      const av = createAvatar(role === 'user' ? 'U' : 'AI', role !== 'user');
+      const bubble = createBubble(text);
+      msg.appendChild(av);
+      msg.appendChild(bubble);
+      convo.appendChild(msg);
+      convo.scrollTop = convo.scrollHeight;
+      return msg;
+    }
+    function appendTyping(){
+      const msg = document.createElement('div');
+      msg.className = 'msg bot';
+      const av = createAvatar('AI', true);
+      const typing = createTyping();
+      msg.appendChild(av);
+      msg.appendChild(typing);
+      convo.appendChild(msg);
+      convo.scrollTop = convo.scrollHeight;
+      return msg;
+    }
+
+    // Mock response generator (local)
+    function pseudoLLMResponse(userText, params) {
+      const seed = (userText + JSON.stringify(params)).length;
+      const choices = [
+        "Entendido. Vou ajudar com isso.",
+        "Aqui está um resumo objetivo:",
+        "Vamos por partes:",
+        "Uma possível abordagem:",
+        "Eis algumas considerações:"
+      ];
+      const head = choices[seed % choices.length];
+
+      const max = Math.max(12, Math.min((Number(params.maxToken)||0)/20 | 0, 120));
+      const words = userText.trim().split(/\s+/).filter(Boolean);
+      const picked = words.slice(0, Math.min(words.length, 24));
+
+      const kb = Array.isArray(params.knowledgeBaseIds) ? params.knowledgeBaseIds : [];
+      const kbNote = kb.length ? `Referências (KB: ${kb.join(", ")}). ` : "";
+
+      const strategyNote = `Estratégia: ${params.strategy}, TopK=${params.topK}. `;
+      const providerNote = `Modelo: ${params.model} em ${params.provider}. `;
+      const sysActive = state.instructionsEnabled ? "Instruções ativas. " : "Instruções desativadas. ";
+      const sysPrefix = state.instructionsEnabled && (params.instructions || '').trim()
+        ? `Diretriz: "${params.instructions.trim().slice(0, 120)}". `
+        : "";
+
+      const body = [
+        ...picked,
+        "•",
+        "resposta",
+        "sintetizada",
+        "com",
+        "base",
+        "na",
+        "entrada.",
+        "Este",
+        "é",
+        "um",
+        "mock",
+        "local."
+      ].slice(0, max);
+
+      return `${head}\n${providerNote}${strategyNote}${kbNote}${sysActive}${sysPrefix}\n${body.join(" ")}`;
+    }
+
+    // Send logic (chat demo)
+    async function handleSend(text){
+      const content = (text ?? promptEl.value).trim();
+      if(!content) return;
+      promptEl.value = '';
+
+      appendMessage('user', content);
+
+      const typingMsg = appendTyping();
+
+      const payload = buildRequestPayload({
+        userInputFallback: content
+      });
+
+      await new Promise(r => setTimeout(r, 300 + Math.random()*300));
+      const response = pseudoLLMResponse(content, payload);
+
+      const bubble = typingMsg.querySelector('.bubble');
+      bubble.textContent = '';
+
+      const chars = Array.from(response);
+      for(let i=0;i<chars.length;i++){
+        bubble.textContent += chars[i];
+        if(i % 3 === 0) await new Promise(r => setTimeout(r, 8));
+        convo.scrollTop = convo.scrollHeight;
+      }
+    }
+
+    btnSend.addEventListener('click', () => handleSend());
+    promptEl.addEventListener('keydown', (e) => {
+      if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+        e.preventDefault();
+        handleSend();
+      }
+    });
+    btnClear.addEventListener('click', () => {
+      convo.innerHTML = '';
+    });
+    btnFake.addEventListener('click', () => {
+      handleSend('Explique brevemente o propósito deste playground e como os parâmetros afetam a resposta.');
+    });
+
+    // Build request payload respecting required keys
+    function buildRequestPayload({ userInputFallback = "" } = {}){
+      const kb = (kbIdsEl.value || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      return {
+        instructions: state.instructionsEnabled ? (instructionsEl.value || "") : "",
+        userInput: (userInputEl.value || "").trim() || userInputFallback,
+        provider: providerEl.value,
+        model: modelEl.value,
+        maxToken: Number(maxTokensEl.value || 0),
+        knowledgeBaseIds: kb,
+        topK: Number(topKEl.value || 0),
+        strategy: strategyEl.value
+      };
+    }
+
+    // Submit form: just save/validate locally
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const payload = buildRequestPayload();
+      const issues = [];
+      if(!payload.userInput) issues.push("userInput vazio");
+      if(!payload.model) issues.push("model vazio");
+      if(payload.maxToken <= 0) issues.push("maxToken deve ser > 0");
+      if(!payload.strategy) issues.push("strategy vazio");
+
+      if(issues.length){
+        formStatus.style.color = 'var(--warn)';
+        formStatus.textContent = "Verifique os campos: " + issues.join("; ");
+      } else {
+        formStatus.style.color = 'var(--muted)';
+        formStatus.textContent = "Parâmetros prontos. Você pode testar o POST.";
+      }
+    });
+
+    // Test button: perform a POST to Flask /test (localhost:5000)
+    btnTestar.addEventListener('click', async () => {
+      const payload = buildRequestPayload();
+      formStatus.style.color = 'var(--muted)';
+      formStatus.textContent = "Enviando para http://localhost:5000/test ...";
+
+      try{
+        const res = await fetch('http://localhost:5000/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const text = await res.text();
+        if(!res.ok){
+          throw new Error(text || ('HTTP ' + res.status));
+        }
+        formStatus.style.color = 'var(--good)';
+        formStatus.textContent = "Sucesso: " + (text.slice(0, 160) || 'ok') + (text.length > 160 ? '...' : '');
+        appendMessage('bot', "Resposta de /test:\n" + text);
+      }catch(err){
+        formStatus.style.color = 'var(--error)';
+        formStatus.textContent = "Erro ao chamar /test: " + err.message;
+        appendMessage('bot', "Falha ao chamar /test:\n" + err.message);
+      }
+    });
+
+    // Seed welcome
+    function seedWelcome(){
+      const hello = "Bem-vindo ao playground de LLM! Use a conversa à direita e ajuste/role os parâmetros à esquerda. O botão 'Testar POST /test' envia o corpo esperado ao Flask.";
+      appendMessage('bot', hello);
+    }
+    seedWelcome();
+  </script>
+</body>
+</html>
